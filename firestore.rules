@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: articles
+    // Fields: title (string), content (string), author (string), createdAt (timestamp), status (string: draft|published), imageUrl (string)
+    //
+    // Collection: pageContent
+    // Fields: pageId (string), sectionId (string), content (map), updatedAt (timestamp)
+    //
+    // Collection: settings
+    // Fields: theme (string), colors (map), fonts (map), layout (map)
+    //
+    // Collection: faqs
+    // Fields: question (string), answer (string), order (number)
+    //
+    // Collection: services
+    // Fields: name (string), description (string), icon (string), price (string)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "midnighthauntings4@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidArticle(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 50000 &&
+             data.status in ['draft', 'published'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /articles/{articleId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin() && isValidArticle(request.resource.data);
+    }
+
+    match /pageContent/{contentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /faqs/{faqId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
